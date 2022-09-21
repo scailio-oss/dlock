@@ -32,14 +32,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/scailio-oss/dlock/factory"
+	"github.com/scailio-oss/dlock"
 )
 
 func TestSimpleLockUnlockLock(t *testing.T) {
 	// GIVEN
 	dynamoDbClient, shutdown := startDynamoDb()
 	defer shutdown()
-	locker := factory.NewLocker(dynamoDbClient, "itest")
+	locker := dlock.NewLocker(dynamoDbClient, "itest")
 	defer locker.Close()
 
 	// WHEN
@@ -59,9 +59,9 @@ func TestSimpleLockLock(t *testing.T) {
 	// GIVEN
 	dynamoDbClient, shutdown := startDynamoDb()
 	defer shutdown()
-	locker := factory.NewLocker(dynamoDbClient, "itest")
+	locker := dlock.NewLocker(dynamoDbClient, "itest")
 	defer locker.Close()
-	locker2 := factory.NewLocker(dynamoDbClient, "itest2")
+	locker2 := dlock.NewLocker(dynamoDbClient, "itest2")
 	defer locker2.Close()
 
 	// WHEN
@@ -81,14 +81,14 @@ func TestLockWithHeartbeats(t *testing.T) {
 	dynamoDbClient, shutdown := startDynamoDb()
 	defer shutdown()
 
-	opts := []factory.LockerOption{
-		factory.WithLease(1 * time.Second),
-		factory.WithHeartbeat(200 * time.Millisecond),
+	opts := []dlock.LockerOption{
+		dlock.WithLease(1 * time.Second),
+		dlock.WithHeartbeat(200 * time.Millisecond),
 	}
 
-	locker := factory.NewLocker(dynamoDbClient, "itest", opts...)
+	locker := dlock.NewLocker(dynamoDbClient, "itest", opts...)
 	defer locker.Close()
-	locker2 := factory.NewLocker(dynamoDbClient, "itest2", opts...)
+	locker2 := dlock.NewLocker(dynamoDbClient, "itest2", opts...)
 	defer locker2.Close()
 
 	// WHEN
@@ -115,15 +115,15 @@ func TestLockSteal(t *testing.T) {
 	dynamoDbClient, shutdown := startDynamoDb()
 	defer shutdown()
 
-	opts := []factory.LockerOption{
-		factory.WithLease(1 * time.Second),
-		factory.WithHeartbeat(10 * time.Second), // high, so no heartbeat will occur
-		factory.WithMaxClockSkew(500 * time.Millisecond),
+	opts := []dlock.LockerOption{
+		dlock.WithLease(1 * time.Second),
+		dlock.WithHeartbeat(10 * time.Second), // high, so no heartbeat will occur
+		dlock.WithMaxClockSkew(500 * time.Millisecond),
 	}
 
-	locker := factory.NewLocker(dynamoDbClient, "itest", opts...)
+	locker := dlock.NewLocker(dynamoDbClient, "itest", opts...)
 	defer locker.Close()
-	locker2 := factory.NewLocker(dynamoDbClient, "itest2", opts...)
+	locker2 := dlock.NewLocker(dynamoDbClient, "itest2", opts...)
 	defer locker2.Close()
 
 	// WHEN

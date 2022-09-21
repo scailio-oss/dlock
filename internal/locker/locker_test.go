@@ -28,7 +28,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/scailio-oss/dlock"
+	error2 "github.com/scailio-oss/dlock/error"
 	"github.com/scailio-oss/dlock/internal/lock"
 	"github.com/scailio-oss/dlock/internal/locker/test"
 	"github.com/scailio-oss/dlock/internal/logger"
@@ -232,7 +232,7 @@ func TestStealAfterClockSkew(t *testing.T) {
 
 	// THEN
 	assert.Error(t, err, "Expected to not be able to lock yet, since clockSkewTime is not done")
-	_, ok := err.(*dlock.LockTakenError)
+	_, ok := err.(*error2.LockTakenError)
 	assert.True(t, ok, "Expected error to be a lockTakenError")
 
 	// WHEN

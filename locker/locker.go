@@ -14,10 +14,12 @@
  *    limitations under the License.
  */
 
-package dlock
+package locker
 
 import (
 	"context"
+
+	"github.com/scailio-oss/dlock/lock"
 )
 
 // Locker creates distributed locks for synchronizing access to objects of the same type.
@@ -48,7 +50,7 @@ type Locker interface {
 	// Stealing locks is not only safe, but actually required to allow automatic recovery of situations where systems of
 	// participating other instances of Locker might've failed to release their locks, e.g. due to system crashes,
 	// container preemptions, network errors etc.
-	TryLock(ctx context.Context, lockId string) (Lock, error)
+	TryLock(ctx context.Context, lockId string) (lock.Lock, error)
 
 	// Close unlocks all currently held locks and frees up all resources. Must be called when the Locker is not needed
 	// anymore.

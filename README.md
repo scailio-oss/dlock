@@ -54,16 +54,15 @@ time to gracefully shut down all operations it might be doing where it relies on
 3. Use:
 
 ```go
-
 package main
 
 import (
 	// snip
-	
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
-	"github.com/scailio-oss/dlock/factory"
+	"github.com/scailio-oss/dlock"
 )
 
 func main() {
@@ -73,14 +72,14 @@ func main() {
 	// Ensure this is unique for this program instance. E.g. use AWS RequestId in Lambda.
 	ownerName := strconv.FormatUint(rand.Uint64(), 16)
 
-	locker := factory.NewLocker(dynamoDbClient, ownerName,
+	locker := dlock.NewLocker(dynamoDbClient, ownerName,
 		// This locker locks objects of type 'streets in NYC'
-		factory.WithLockIdPrefix("nyc-street-"),
-		factory.WithLease(10*time.Second),
-		factory.WithHeartbeat(2*time.Second),
-		factory.WithMaxClockSkew(10*time.Second),
-		factory.WithWarnAfter(9*time.Second),
-		factory.WithDynamoDbTimeout(1*time.Second),
+		dlock.WithLockIdPrefix("nyc-street-"),
+		dlock.WithLease(10*time.Second),
+		dlock.WithHeartbeat(2*time.Second),
+		dlock.WithMaxClockSkew(10*time.Second),
+		dlock.WithWarnAfter(9*time.Second),
+		dlock.WithDynamoDbTimeout(1*time.Second),
 	)
 	defer locker.Close()
 
@@ -92,7 +91,7 @@ func main() {
 	}
 
 	// TODO do things exclusively on object 'wallstreet'
-	
+
 	select {
 	case <-lock.WarnChan():
 		// Will fire after 9 seconds after the last successful heartbeat
@@ -113,7 +112,7 @@ func main() {
 
 * https://github.com/cirello-io/dynamolock v2
   * Instead of an absolute "lease until" timestamp, `dynamolock` stores a "duration" in the database with the downsides
-    noted above
+    for short-lived processes as noted above
 * https://github.com/Clever/dynamodb-lock-go 
   * `dynamo-lock-go` uses AWS SDK v1 instead of v2
 

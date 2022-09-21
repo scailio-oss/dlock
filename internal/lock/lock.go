@@ -23,7 +23,7 @@ import (
 
 	"github.com/benbjohnson/clock"
 
-	"github.com/scailio-oss/dlock"
+	"github.com/scailio-oss/dlock/lock"
 	"github.com/scailio-oss/dlock/logger"
 )
 
@@ -37,7 +37,7 @@ type UnlockFn func(context.Context, Lock)
 // Additionally a Lock provides a "lock for update" which can be used externally by functions which need exclusivity
 // when preparing a call to Update.
 type Lock interface {
-	dlock.Lock
+	lock.Lock
 
 	// Update the internal state of the lock, setting the values. Returns true on success and false if this lock was
 	// already expired with the old values. In the latter case, the new values are not applied and it cannot be guaranteed

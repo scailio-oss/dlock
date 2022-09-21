@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scailio-oss/dlock"
+	error2 "github.com/scailio-oss/dlock/error"
 	"github.com/scailio-oss/dlock/internal/storage"
 )
 
@@ -76,7 +76,7 @@ func (m *MockDb) InsertNewLock(_ context.Context, lockId string, ownerName strin
 
 	if l, ok := m.Locks[lockId]; ok {
 		if !l.LeaseUntil.Before(stealLockUntil) {
-			return nil, &dlock.LockTakenError{Cause: errors.New("still locked")}
+			return nil, &error2.LockTakenError{Cause: errors.New("still locked")}
 		}
 	}
 	m.Locks[lockId] = &MockLock{

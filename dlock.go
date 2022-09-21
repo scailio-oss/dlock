@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package factory
+package dlock
 
 import (
 	"time"
@@ -22,11 +22,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/benbjohnson/clock"
 
-	"github.com/scailio-oss/dlock"
 	"github.com/scailio-oss/dlock/internal/lock"
 	internallocker "github.com/scailio-oss/dlock/internal/locker"
 	internallogger "github.com/scailio-oss/dlock/internal/logger"
 	"github.com/scailio-oss/dlock/internal/storage"
+	"github.com/scailio-oss/dlock/locker"
 	"github.com/scailio-oss/dlock/logger"
 )
 
@@ -40,7 +40,7 @@ const defaultDynamoDbTimeout = 1 * time.Second
 // NewLocker creates a new Locker based on DynamoDB.
 // ownerName: unique name identifying this Locker instance - this information will be written into the DynamoDB
 // options: Additional, optional options.
-func NewLocker(dynamodbClient *dynamodb.Client, ownerName string, options ...LockerOption) dlock.Locker {
+func NewLocker(dynamodbClient *dynamodb.Client, ownerName string, options ...LockerOption) locker.Locker {
 	params := &LockerParams{}
 	for _, opt := range options {
 		opt(params)

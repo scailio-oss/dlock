@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package dlock
+package error
 
 import (
 	"fmt"

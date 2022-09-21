@@ -24,9 +24,11 @@ import (
 
 	"github.com/benbjohnson/clock"
 
-	"github.com/scailio-oss/dlock"
+	error2 "github.com/scailio-oss/dlock/error"
 	"github.com/scailio-oss/dlock/internal/lock"
 	"github.com/scailio-oss/dlock/internal/storage"
+	lock2 "github.com/scailio-oss/dlock/lock"
+	"github.com/scailio-oss/dlock/locker"
 	"github.com/scailio-oss/dlock/logger"
 )
 
@@ -54,7 +56,7 @@ type lockerImpl struct {
 
 // Create a new Locker. WarnChanManager will be closed when the Locker is closed. Other params: See factory.NewLocker.
 func New(db storage.DB, clock clock.Clock, logger logger.Logger, ownerName string, lease time.Duration, heartbeat time.Duration,
-	warnAfter time.Duration, lockIdPrefix string, maxClockSkew time.Duration, warnChanManager lock.WarnChanManager) dlock.Locker {
+	warnAfter time.Duration, lockIdPrefix string, maxClockSkew time.Duration, warnChanManager lock.WarnChanManager) locker.Locker {
 	l := &lockerImpl{
 		logger:               logger,
 		ownerName:            ownerName,
@@ -81,7 +83,7 @@ func New(db storage.DB, clock clock.Clock, logger logger.Logger, ownerName strin
 	return l
 }
 
-func (l *lockerImpl) TryLock(ctx context.Context, lockId string) (dlock.Lock, error) {
+func (l *lockerImpl) TryLock(ctx context.Context, lockId string) (lock2.Lock, error) {
 	// lock this mu during TryLock to not start closing while acquiring this lock.
 	l.closedMu.RLock()
 	defer l.closedMu.RUnlock()
@@ -111,7 +113,7 @@ func (l *lockerImpl) TryLock(ctx context.Context, lockId string) (dlock.Lock, er
 	l.activeLocksMu.Lock()
 	if _, ok := l.activeLocks[lockId]; ok {
 		l.activeLocksMu.Unlock()
-		return nil, &dlock.LockTakenError{Cause: errors.New("Same Locker has acquired the lease of this lockId already.")}
+		return nil, &error2.LockTakenError{Cause: errors.New("Same Locker has acquired the lease of this lockId already.")}
 	}
 	l.activeLocks[lockId] = res
 	l.activeLocksMu.Unlock()

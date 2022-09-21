@@ -27,7 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"github.com/scailio-oss/dlock"
+	error2 "github.com/scailio-oss/dlock/error"
 )
 
 const (
@@ -86,7 +86,7 @@ func (d *DynamoDB) InsertNewLock(ctx context.Context, lockId string, ownerName s
 	if err != nil {
 		var conditionalCheckFailedException *types.ConditionalCheckFailedException
 		if errors.As(err, &conditionalCheckFailedException) {
-			return nil, &dlock.LockTakenError{Cause: err}
+			return nil, &error2.LockTakenError{Cause: err}
 		}
 		return nil, err
 	}
