@@ -50,6 +50,12 @@ type Locker interface {
 	// Stealing locks is not only safe, but actually required to allow automatic recovery of situations where systems of
 	// participating other instances of Locker might've failed to release their locks, e.g. due to system crashes,
 	// container preemptions, network errors etc.
+	//
+	// As with all distributed locks, this lock cannot guarantee exclusivity in cases where the process that locked an
+	// object is paused for a time larger than the lease time. When that process continues, it might be under the
+	// impression that is still holding the lock, though another process has acquired it successfully in the meantime.
+	// See this excellent post for details:
+	// https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html#protecting-a-resource-with-a-lock
 	TryLock(ctx context.Context, lockId string) (lock.Lock, error)
 
 	// Close unlocks all currently held locks and frees up all resources. Must be called when the Locker is not needed
