@@ -36,6 +36,7 @@ const defaultHeartbeat = 15 * time.Second
 const defaultWarnAfter = 50 * time.Second
 const defaultMaxClockSkew = 10 * time.Second
 const defaultDynamoDbTimeout = 1 * time.Second
+const defaultFencingEnabled = false
 
 // NewLocker creates a new Locker based on DynamoDB.
 // ownerName: unique name identifying this Locker instance - this information will be written into the DynamoDB
@@ -67,11 +68,14 @@ func NewLocker(dynamodbClient *dynamodb.Client, ownerName string, options ...Loc
 	if params.dynamoDbTimeout == 0 {
 		params.dynamoDbTimeout = defaultDynamoDbTimeout
 	}
+	if params.fencingEnabled == nil {
+		d := defaultFencingEnabled
+		params.fencingEnabled = &d
+	}
 	// lockIdPrefix is by default "" already
 
 	clk := clock.New()
 
-	db := storage.NewDynamoDb(dynamodbClient, params.tableName, params.dynamoDbTimeout)
 	var wcm lock.WarnChanManager
 	if params.warnDisabled {
 		wcm = lock.NewNoopWarnChanManager()
@@ -79,8 +83,15 @@ func NewLocker(dynamodbClient *dynamodb.Client, ownerName string, options ...Loc
 		wcm = lock.NewWarnChanManager(params.logger, clk)
 	}
 
-	return internallocker.New(db, clk, params.logger, ownerName, params.lease, params.heartbeat,
-		params.warnAfter, params.lockIdPrefix, params.maxClockSkew, wcm)
+	if *params.fencingEnabled {
+		db := storage.NewDynamoDbWithFencing(dynamodbClient, params.tableName, params.dynamoDbTimeout)
+		return internallocker.NewWithFencing(db, clk, params.logger, ownerName, params.lease, params.heartbeat,
+			params.warnAfter, params.lockIdPrefix, params.maxClockSkew, wcm)
+	} else {
+		db := storage.NewDynamoDb(dynamodbClient, params.tableName, params.dynamoDbTimeout)
+		return internallocker.New(db, clk, params.logger, ownerName, params.lease, params.heartbeat,
+			params.warnAfter, params.lockIdPrefix, params.maxClockSkew, wcm)
+	}
 }
 
 type LockerParams struct {
@@ -93,6 +104,7 @@ type LockerParams struct {
 	lockIdPrefix    string
 	maxClockSkew    time.Duration
 	dynamoDbTimeout time.Duration
+	fencingEnabled  *bool
 }
 
 type LockerOption func(params *LockerParams)
@@ -191,5 +203,18 @@ func WithMaxClockSkew(maxClockSkew time.Duration) LockerOption {
 func WithDynamoDbTimeout(dynamoDbTimeout time.Duration) LockerOption {
 	return func(params *LockerParams) {
 		params.dynamoDbTimeout = dynamoDbTimeout
+	}
+}
+
+// Use this fencing state instead of the default.
+//
+// When fencing is enabled, each lock provides a fencing token, otherwise not. Maintaining fencing tokens has downsides:
+//
+// * More requests to DynamoDB needed
+// * Locks are not actually deleted in DynamoDB but need to be kept there forever, in order to ensure that the fencing
+//   tokens fulfill the promises as given in Lock.FencingToken() (monotonically increasing).
+func WithFencingEnabled(fencingEnabled bool) LockerOption {
+	return func(params *LockerParams) {
+		params.fencingEnabled = &fencingEnabled
 	}
 }

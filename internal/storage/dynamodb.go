@@ -30,12 +30,6 @@ import (
 	error2 "github.com/scailio-oss/dlock/error"
 )
 
-const (
-	pkFieldName        = "key"
-	lockOwnerFieldName = "owner"
-	untilFieldName     = "until"
-)
-
 type DynamoDB struct {
 	dynamoDbClient *dynamodb.Client
 	tableName      string

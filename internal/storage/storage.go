@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"math/big"
 	"time"
 )
 
@@ -35,6 +36,34 @@ type DB interface {
 	// Remove a lock iff its current leaseUntil and owner is as specified. If the lock is not removed or any other error
 	// occurs, return an error.
 	RemoveLock(ctx context.Context, lockId string, leaseUntil time.Time, ownerName string) error
+
+	// Update the leaseUntil field of an existing lock iff its current leaseUntil is still oldUntil and the owner is as
+	// specified. If the lock is not updated or any other error occurs, return an error.
+	UpdateUntil(ctx context.Context, lockId string, oldUntil time.Time, newUntil time.Time, ownerName string) error
+}
+
+// Database layer providing serializable compare-and-set operations as required by the Locker with Fencing support.
+//
+// A lock has a unique identifying lockId and if it is locked a current ownerName and a timestamp until when it is
+// leased by that owner. A lock can be stolen if the existing leaseTime is older than a specific time.
+type FencingDB interface {
+	// Inserts a new lock with the given details iff none exists or the exisiting lock is older than stealLockUntil. In
+	// the latter case the lock is stolen and details about the old lock are returned. The lock fencing token is retruned
+	// always.
+	// If the lock is taken by someone else and it is not being stolen, a dlock.LockTakenError is returned, but other
+	// errors may be returned.
+	//
+	// The big.Int result is the unique fencing token for the new lock.
+	//
+	// A fencing token is guaranteed to be of larger value than all previously acquired locks for the given lockId
+	// (monotonically increasing). It can be used for fencing support in downstream systems as described at
+	// https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html#making-the-lock-safe-with-fencing.
+	// The actual token will never be negative.
+	InsertNewLock(ctx context.Context, lockId string, ownerName string, leaseUntil time.Time, stealLockUntil time.Time) (*StolenLockInfo, *big.Int, error)
+
+	// Release a lock iff its current leaseUntil and owner is as specified. If the lock is not released or any other error
+	// occurs, return an error.
+	ReleaseLock(ctx context.Context, lockId string, leaseUntil time.Time, ownerName string) error
 
 	// Update the leaseUntil field of an existing lock iff its current leaseUntil is still oldUntil and the owner is as
 	// specified. If the lock is not updated or any other error occurs, return an error.

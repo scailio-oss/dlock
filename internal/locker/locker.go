@@ -19,6 +19,7 @@ package locker
 import (
 	"context"
 	"errors"
+	"math/big"
 	"sync"
 	"time"
 
@@ -36,6 +37,7 @@ type lockerImpl struct {
 	logger               logger.Logger
 	ownerName            string
 	db                   storage.DB
+	fencingDb            storage.FencingDB
 	clock                clock.Clock
 	warnChanManager      lock.WarnChanManager
 	leaseDuration        time.Duration
@@ -61,6 +63,35 @@ func New(db storage.DB, clock clock.Clock, logger logger.Logger, ownerName strin
 		logger:               logger,
 		ownerName:            ownerName,
 		db:                   db,
+		clock:                clock,
+		warnChanManager:      warnChanManager,
+		leaseDuration:        lease,
+		heartbeatDuration:    heartbeat,
+		warnAfterDuration:    warnAfter,
+		lockIdPrefix:         lockIdPrefix,
+		maxClockSkewDuration: maxClockSkew,
+
+		closeChan:   make(chan struct{}),
+		activeLocks: map[string]lock.Lock{},
+	}
+
+	startupCompleteChan := make(chan struct{})
+	go l.heartbeatLoop(startupCompleteChan)
+	// Wait until the goroutine actually started. In unit tests we saw that the main goroutine might starve the heartbeatLoop
+	// from starting up, in that case messing with all timings. Instead of using runtime.Gosched(), we chose to explicitly
+	// block until we know the goroutine has started, since Gosched cannot guarantee this.
+	<-startupCompleteChan
+
+	return l
+}
+
+// Create a new Locker with fencing support. WarnChanManager will be closed when the Locker is closed. Other params: See factory.NewLocker.
+func NewWithFencing(db storage.FencingDB, clock clock.Clock, logger logger.Logger, ownerName string, lease time.Duration, heartbeat time.Duration,
+	warnAfter time.Duration, lockIdPrefix string, maxClockSkew time.Duration, warnChanManager lock.WarnChanManager) locker.Locker {
+	l := &lockerImpl{
+		logger:               logger,
+		ownerName:            ownerName,
+		fencingDb:            db,
 		clock:                clock,
 		warnChanManager:      warnChanManager,
 		leaseDuration:        lease,
@@ -118,7 +149,14 @@ func (l *lockerImpl) TryLock(ctx context.Context, lockId string) (lock2.Lock, er
 	l.activeLocks[lockId] = res
 	l.activeLocksMu.Unlock()
 
-	stolen, err := l.db.InsertNewLock(ctx, lockId, l.ownerName, until, stealUntil)
+	var stolen *storage.StolenLockInfo
+	var err error
+	var fencingToken *big.Int
+	if l.db != nil {
+		stolen, err = l.db.InsertNewLock(ctx, lockId, l.ownerName, until, stealUntil)
+	} else {
+		stolen, fencingToken, err = l.fencingDb.InsertNewLock(ctx, lockId, l.ownerName, until, stealUntil)
+	}
 	if err != nil {
 		l.logger.Error(ctx, "Could not acquire lock (lockId)", lockId)
 
@@ -139,6 +177,10 @@ func (l *lockerImpl) TryLock(ctx context.Context, lockId string) (lock2.Lock, er
 
 	res.Update(lockId, until, now.Add(l.warnAfterDuration), false)
 
+	if fencingToken != nil {
+		res.SetFencingToken(fencingToken)
+	}
+
 	return res, nil
 }
 
@@ -151,7 +193,12 @@ func (l *lockerImpl) unlock(ctx context.Context, lock lock.Lock) {
 		return
 	}
 
-	err := l.db.RemoveLock(ctx, lock.LockId(), lock.LeaseUntil(), l.ownerName)
+	var err error
+	if l.db != nil {
+		err = l.db.RemoveLock(ctx, lock.LockId(), lock.LeaseUntil(), l.ownerName)
+	} else {
+		err = l.fencingDb.ReleaseLock(ctx, lock.LockId(), lock.LeaseUntil(), l.ownerName)
+	}
 
 	if err != nil {
 		l.logger.Warn(ctx, "Error while unlocking lock, ignoring (lockId/until)", lock.LockId(), lock.LeaseUntil(), err)
@@ -191,7 +238,12 @@ func (l *lockerImpl) heartbeat(ctx context.Context, lock lock.Lock) {
 	now := l.clock.Now()
 	newUntil := now.Add(l.leaseDuration)
 
-	err := l.db.UpdateUntil(ctx, lock.LockId(), lock.LeaseUntil(), newUntil, l.ownerName)
+	var err error
+	if l.db != nil {
+		err = l.db.UpdateUntil(ctx, lock.LockId(), lock.LeaseUntil(), newUntil, l.ownerName)
+	} else {
+		err = l.fencingDb.UpdateUntil(ctx, lock.LockId(), lock.LeaseUntil(), newUntil, l.ownerName)
+	}
 
 	if err != nil {
 		l.logger.Error(ctx, "Heartbeat failed on lock (lockId/oldUntil)", lock.LockId(), lock.LeaseUntil())

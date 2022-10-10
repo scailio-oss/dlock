@@ -6,15 +6,15 @@ AWS DynamoDB - making it the perfect choice for your AWS Lambda functions.
 
 ## Features
 
-### Safety
+### Safety with fencing tokens
 
 Locks returned by `dlock` ensure that no other parallel process can acquire the same lock. Since it is built for
 distributed systems, there are some situations where `dlock` cannot be sure if it still has the lock (e.g. network
 issues to DynamoDB) - in these cases `dlock` always errs on the side of caution, rather marking a lock as expired than
-proceeding if unsure. Note that this guarantee only holds as long as the process holding the lock does not get paused
-for a time greater than the lease time, see 
+proceeding if unsure. Note that this guarantee only holds as long as either fencing tokens are used or the process
+holding the lock does not get paused for a time greater than the lease time. See 
 [Martin Kleppmanns post](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html#protecting-a-resource-with-a-lock) 
-for more details on distributed locking,
+for more details on distributed locking and fencing tokens. `dlock` supports generating fencing tokens.
 
 The safety guarantees are ultimately based on the guarantees that DynamoDB gives for conditional writes, see 
 [AWS docs](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithItems.html#WorkingWithItems.ConditionalUpdate).
@@ -116,8 +116,10 @@ func main() {
 * https://github.com/cirello-io/dynamolock v2
   * Instead of an absolute "lease until" timestamp, `dynamolock` stores a "duration" in the database with the downsides
     for short-lived processes as noted above
+  * Does not generate fencing tokens
 * https://github.com/Clever/dynamodb-lock-go 
   * `dynamo-lock-go` uses AWS SDK v1 instead of v2
+  * Does not generate fencing tokens
 
 ## License
 

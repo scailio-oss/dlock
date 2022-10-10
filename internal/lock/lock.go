@@ -18,6 +18,7 @@ package lock
 
 import (
 	"context"
+	"math/big"
 	"sync"
 	"time"
 
@@ -59,6 +60,9 @@ type Lock interface {
 	LeaseUntil() time.Time
 	// The current state of the unlocked flag
 	Unlocked() bool
+
+	// SetFencingToken sets the fencing token
+	SetFencingToken(token *big.Int)
 }
 
 // Create a new lock. Call Update to initialize the object.
@@ -84,6 +88,8 @@ type lockImpl struct {
 	lockId     string
 	leaseUntil time.Time
 	unlocked   bool
+
+	fencingToken *big.Int
 
 	updateMu sync.Mutex // Mutex used externally to prepare calls to Update.
 }
@@ -179,4 +185,23 @@ func (l *lockImpl) Unlocked() bool {
 	defer l.internalMu.Unlock()
 
 	return l.unlocked
+}
+
+func (l *lockImpl) SetFencingToken(token *big.Int) {
+	l.internalMu.Lock()
+	defer l.internalMu.Unlock()
+
+	l.fencingToken = token
+}
+
+func (l *lockImpl) FencingToken() *big.Int {
+	l.internalMu.Lock()
+	defer l.internalMu.Unlock()
+
+	if l.fencingToken == nil {
+		return nil
+	}
+	token := big.Int{}
+	token.Set(l.fencingToken)
+	return &token
 }
